@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import time
 
 from app.core.razorpay_client import client
+from app.core.email_client import send_recovery_email
 
 from app.database.models import Transaction
 from app.engine.state_manager import transition_state
@@ -48,16 +49,43 @@ def handle_bank_downtime(
         reason="Bank/network failure; retry scheduled for 6 hours later"
     )
 
+
 def handle_insufficient_funds(
     db: Session,
     transaction: Transaction
 ):
-    return transition_state(
+    transaction = transition_state(
         db=db,
         transaction=transaction,
         new_state="OUTREACH_PENDING",
         action="GENERATE_RECOVERY_OUTREACH",
-        reason="Insufficient funds; user should be offered payment-method recovery"
+        reason="Insufficient funds; preparing email recovery outreach"
+    )
+
+    email_result = send_recovery_email(transaction)
+
+    if email_result["status"] == "sent":
+        reason = (
+            f"Recovery email sent to {email_result['to']} "
+            f"({email_result['subject']})"
+        )
+    elif email_result["status"] == "simulated":
+        reason = (
+            f"Recovery email simulated to {email_result['to']} "
+            f"({email_result['subject']}); {email_result['detail']}"
+        )
+    else:
+        reason = (
+            f"Recovery email failed for {email_result['to']}: "
+            f"{email_result.get('detail', 'unknown error')}"
+        )
+
+    return transition_state(
+        db=db,
+        transaction=transaction,
+        new_state="OUTREACH_SENT",
+        action="SEND_RECOVERY_EMAIL",
+        reason=reason,
     )
 
 

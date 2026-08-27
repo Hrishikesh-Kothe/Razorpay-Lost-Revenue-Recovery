@@ -48,6 +48,7 @@ def calculate_metrics(db: Session):
     recovery_actions = (
         state_counts.get("RETRY_SCHEDULED", 0)
         + state_counts.get("OUTREACH_PENDING", 0)
+        + state_counts.get("OUTREACH_SENT", 0)
         + state_counts.get("RECOVERY_LINK_CREATED", 0)
     )
 
@@ -87,6 +88,22 @@ def calculate_metrics(db: Session):
     }
 
 
+def _serialize_log(log: AuditLog):
+    return {
+        "id": log.id,
+        "transaction_id": log.transaction_id,
+        "previous_state": log.previous_state,
+        "new_state": log.new_state,
+        "action": log.action,
+        "reason": log.reason,
+        "created_at": (
+            log.created_at.isoformat()
+            if log.created_at
+            else None
+        ),
+    }
+
+
 def get_execution_logs(
     db: Session,
     limit: int = 25
@@ -98,19 +115,57 @@ def get_execution_logs(
         .all()
     )
 
-    return [
-        {
-            "id": log.id,
-            "transaction_id": log.transaction_id,
-            "previous_state": log.previous_state,
-            "new_state": log.new_state,
-            "action": log.action,
-            "reason": log.reason,
-            "created_at": (
-                log.created_at.isoformat()
-                if log.created_at
+    return [_serialize_log(log) for log in logs]
+
+
+def get_transaction_detail(db: Session, transaction_id: str):
+    transaction = (
+        db.query(Transaction)
+        .filter(Transaction.transaction_id == transaction_id)
+        .first()
+    )
+
+    if not transaction:
+        return None
+
+    timeline = (
+        db.query(AuditLog)
+        .filter(AuditLog.transaction_id == transaction_id)
+        .order_by(AuditLog.created_at.asc(), AuditLog.id.asc())
+        .all()
+    )
+
+    return {
+        "transaction": {
+            "transaction_id": transaction.transaction_id,
+            "customer_id": transaction.customer_id,
+            "amount": transaction.amount,
+            "error_code": transaction.error_code,
+            "failure_type": transaction.failure_type,
+            "current_state": transaction.current_state,
+            "attempt_count": transaction.attempt_count,
+            "opt_out": transaction.opt_out,
+            "recovery_outcome": transaction.recovery_outcome,
+            "recovered_amount": transaction.recovered_amount,
+            "original_amount": transaction.original_amount,
+            "discounted_amount": transaction.discounted_amount,
+            "payment_link_id": transaction.payment_link_id,
+            "payment_link_url": transaction.payment_link_url,
+            "retry_scheduled_at": (
+                transaction.retry_scheduled_at.isoformat()
+                if transaction.retry_scheduled_at
                 else None
             ),
-        }
-        for log in logs
-    ]
+            "created_at": (
+                transaction.created_at.isoformat()
+                if transaction.created_at
+                else None
+            ),
+            "updated_at": (
+                transaction.updated_at.isoformat()
+                if transaction.updated_at
+                else None
+            ),
+        },
+        "timeline": [_serialize_log(log) for log in timeline],
+    }

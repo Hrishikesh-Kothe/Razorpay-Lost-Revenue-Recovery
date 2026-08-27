@@ -5,10 +5,13 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
-# Env / secrets
+# Env / secrets — never commit real credentials
 .env
-.env.local
-.env.*.local
+**/.env
+.env.*
+**/.env.*
+!.env.example
+!**/.env.example
 
 # Local databases
 *.db

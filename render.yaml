@@ -1,0 +1,28 @@
+# Optional Render blueprint for the FastAPI backend.
+# Create the service from the dashboard if you prefer a manual setup.
+
+services:
+  - type: web
+    name: razorpay-revenue-recovery-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: RZP_KEY_ID
+        sync: false
+      - key: RZP_KEY_SECRET
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: EMAIL_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: EMAIL_TO_OVERRIDE
+        sync: false
+      - key: EMAIL_SEND_LIVE
+        value: "false"

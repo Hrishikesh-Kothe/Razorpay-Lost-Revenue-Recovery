@@ -1,8 +1,12 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database.database import get_db
-from app.engine.metrics import calculate_metrics, get_execution_logs
+from app.engine.metrics import (
+    calculate_metrics,
+    get_execution_logs,
+    get_transaction_detail,
+)
 
 
 router = APIRouter(prefix="/metrics", tags=["Metrics"])
@@ -19,3 +23,19 @@ def get_logs(
     db: Session = Depends(get_db),
 ):
     return {"logs": get_execution_logs(db, limit)}
+
+
+@router.get("/transactions/{transaction_id}")
+def get_transaction(
+    transaction_id: str,
+    db: Session = Depends(get_db),
+):
+    detail = get_transaction_detail(db, transaction_id)
+
+    if not detail:
+        raise HTTPException(
+            status_code=404,
+            detail="Transaction not found",
+        )
+
+    return detail

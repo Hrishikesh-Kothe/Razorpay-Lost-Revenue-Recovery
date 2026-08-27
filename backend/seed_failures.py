@@ -1,5 +1,18 @@
 import random
 import uuid
+from unittest.mock import patch
+
+from app.database.database import SessionLocal
+from app.database.models import Transaction, AuditLog
+from app.engine.graph import recovery_graph
+
+
+FAILURE_DISTRIBUTION = (
+    ["GATEWAY_ERROR"] * 20
+    + ["INSUFFICIENT_FUNDS"] * 25
+    + ["CART_ABANDONMENT"] * 5
+)
+
 
 def simulate_recovery_outcome(transaction):
     """
@@ -30,17 +43,6 @@ def simulate_recovery_outcome(transaction):
         transaction.recovered_amount = 0
 
     return transaction
-
-from app.database.database import SessionLocal
-from app.database.models import Transaction, AuditLog
-from app.engine.graph import recovery_graph
-
-
-FAILURE_DISTRIBUTION = (
-    ["GATEWAY_ERROR"] * 20
-    + ["INSUFFICIENT_FUNDS"] * 25
-    + ["CART_ABANDONMENT"] * 5
-)
 
 
 def generate_transaction(index: int, error_code: str):
@@ -76,7 +78,7 @@ def generate_transaction(index: int, error_code: str):
         opt_out=False,
         recovery_outcome="PENDING",
         recovered_amount=0,
-)
+    )
 
     return transaction
 
@@ -97,49 +99,36 @@ def process_transaction(db, transaction):
     db.commit()
     db.refresh(transaction)
 
-    result = recovery_graph.invoke({
-        "db": db,
-        "transaction_id": transaction.transaction_id,
-        "failure_type": transaction.failure_type,
-        "policy_allowed": False,
-        "policy_reason": "",
-        "current_state": transaction.current_state,
-    })
+    # Seed must not create live Razorpay payment links
+    mock_link = {
+        "id": f"plink_mock_{transaction.transaction_id}",
+        "short_url": (
+            f"https://rzp.io/i/mock/{transaction.transaction_id}"
+        ),
+    }
+
+    with patch(
+        "app.engine.recovery.client.payment_link.create",
+        return_value=mock_link,
+    ):
+        recovery_graph.invoke({
+            "db": db,
+            "transaction_id": transaction.transaction_id,
+            "failure_type": transaction.failure_type,
+            "policy_allowed": False,
+            "policy_reason": "",
+            "current_state": transaction.current_state,
+        })
 
     db.refresh(transaction)
-    
-    transaction = simulate_recovery_outcome(
-        transaction
-)
+
+    transaction = simulate_recovery_outcome(transaction)
 
     db.commit()
     db.refresh(transaction)
 
     return transaction
 
-
-def simulate_recovery_outcome(transaction):
-    recovery_probability = {
-        "BANK_DOWNTIME": 0.70,
-        "INSUFFICIENT_FUNDS": 0.45,
-        "CART_ABANDONMENT": 0.60,
-    }
-
-    probability = recovery_probability.get(
-        transaction.failure_type,
-        0.50,
-    )
-
-    recovered = random.random() < probability
-
-    if recovered:
-        transaction.recovery_outcome = "RECOVERED"
-        transaction.recovered_amount = transaction.amount
-    else:
-        transaction.recovery_outcome = "FAILED"
-        transaction.recovered_amount = 0
-
-    return transaction
 
 def main():
     db = SessionLocal()

@@ -10,7 +10,8 @@ def check_policy(
     if opt_out:
         return False, "USER_OPTED_OUT"
 
-    # Block if 3 recovery attempts have already happened
+    # Policy runs before attempt increment, so counts 0, 1, and 2
+    # are allowed (three executions). Count >= 3 blocks further recovery.
     if attempt_count >= MAX_ATTEMPTS:
         return False, "MAX_ATTEMPTS_REACHED"
 
