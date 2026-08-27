@@ -29,14 +29,22 @@ def test_seed_demo_dataset_is_deterministic(db_session):
     assert metrics["total_recovered"] > 0
 
 
-def test_demo_seed_endpoint_respects_flag(client, monkeypatch):
+def test_demo_seed_endpoint_respects_flag(client, monkeypatch, make_transaction):
     monkeypatch.setenv("ENABLE_DEMO_SEED", "false")
+
+    # Sparse DB (<10) may bootstrap even when the flag is off.
+    allowed = client.post("/demo/seed")
+    assert allowed.status_code == 200
+    assert allowed.json()["metrics"]["total_transactions"] == 36
+
+    monkeypatch.setenv("ENABLE_DEMO_SEED", "false")
+    for index in range(10):
+        make_transaction(transaction_id=f"block_{index}")
+
     blocked = client.post("/demo/seed")
     assert blocked.status_code == 403
 
     monkeypatch.setenv("ENABLE_DEMO_SEED", "true")
-    allowed = client.post("/demo/seed")
-    assert allowed.status_code == 200
-    body = allowed.json()
-    assert body["status"] == "seeded"
-    assert body["metrics"]["total_transactions"] == 36
+    forced = client.post("/demo/seed")
+    assert forced.status_code == 200
+    assert forced.json()["metrics"]["total_transactions"] == 36

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database.database import get_db
+from app.database.models import Transaction
 from app.demo.seed_demo import seed_demo_dataset
 
 
@@ -23,11 +24,14 @@ def _demo_seed_enabled() -> bool:
 def seed_demo(
     replace: bool = Query(
         default=True,
-        description="Replace existing demo_* rows before seeding",
+        description="Replace existing rows before seeding",
     ),
     db: Session = Depends(get_db),
 ):
-    if not _demo_seed_enabled():
+    txn_count = db.query(Transaction).count()
+    bootstrap_ok = txn_count < 10
+
+    if not _demo_seed_enabled() and not bootstrap_ok:
         raise HTTPException(
             status_code=403,
             detail=(
