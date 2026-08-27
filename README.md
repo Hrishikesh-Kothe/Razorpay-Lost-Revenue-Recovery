@@ -6,7 +6,7 @@ Built as a full-stack PoC: **FastAPI + LangGraph** orchestration, **Resend** ema
 
 ---
 
-## Live demo (for judges)
+## Live deployment
 
 | Surface | URL |
 |--------|-----|
@@ -17,12 +17,12 @@ Built as a full-stack PoC: **FastAPI + LangGraph** orchestration, **Resend** ema
 
 > **Note:** The Render free tier may cold-start (~30–60s) on the first API request. If the dashboard briefly shows offline, refresh once the health endpoint returns `{"status":"ok"}`.
 
-### 60-second walkthrough
+### Quick product tour
 
 1. Open the **dashboard** — confirm **Engine Online**.
 2. Read the KPI row: failed payments, failed value, recovered ₹, still open, success rate, yield.
 3. Open **View all transactions** → click any row → inspect the **timeline** + progress states.
-4. On a non-opted-out transaction, click **STOP recovery** to demo the opt-out guardrail.
+4. On a non-opted-out transaction, click **STOP recovery** to see the opt-out guardrail.
 5. Optional API smoke test:
 
 ```bash
@@ -75,7 +75,7 @@ Razorpay failure webhook
 | **Policy guardrails** | Max **3** recovery attempts · customer **STOP / opt-out** · full audit trail |
 | **Recovery actions** | Retry scheduling · formal English email outreach · discounted payment link |
 | **Merchant UI** | KPI equations, path/outcome charts, live transaction list, timeline drawer |
-| **Demo dataset** | Deterministic 36-failure walkthrough seed (recovered + pending + failed mix) |
+| **Sample dataset** | Deterministic 36-failure walkthrough seed (recovered + pending + failed mix) |
 
 ### How dashboard numbers add up
 
@@ -127,13 +127,13 @@ flowchart LR
 .
 ├── backend/
 │   ├── app/
-│   │   ├── api/          # webhooks, metrics, customer STOP, demo seed
+│   │   ├── api/          # webhooks, metrics, customer STOP, sample seed
 │   │   ├── core/         # Razorpay + email clients
 │   │   ├── database/     # models + session
-│   │   ├── demo/         # deterministic walkthrough dataset
+│   │   ├── demo/         # deterministic sample dataset
 │   │   └── engine/       # classifier, policy, recovery, LangGraph, metrics
 │   ├── tests/            # 70+ pytest cases
-│   ├── seed_demo.py      # load walkthrough data locally
+│   ├── seed_demo.py      # load sample walkthrough data locally
 │   ├── Dockerfile
 │   └── .env.example
 ├── frontend/             # Next.js merchant dashboard
@@ -194,7 +194,7 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-### Load the demo dataset (recommended for video / judges)
+### Load the sample dataset
 
 ```bash
 cd backend
@@ -258,7 +258,7 @@ Templates only — **never commit real secrets**.
 | `DATABASE_URL` | Backend | SQLite or Postgres URL |
 | `CORS_ORIGINS` | Backend | Allowed browser origins (comma-separated) |
 | `EMAIL_API_KEY` / `EMAIL_FROM` | Backend | Resend outreach |
-| `EMAIL_TO_OVERRIDE` | Backend | Force all demo mail to one inbox |
+| `EMAIL_TO_OVERRIDE` | Backend | Force all outreach mail to one inbox |
 | `EMAIL_SEND_LIVE` | Backend | `false` = simulate sends (default, saves credits) |
 | `ENABLE_DEMO_SEED` | Backend | Allow `POST /demo/seed` when DB is not sparse |
 | `ENABLE_RAZORPAY_TEST` | Backend | Gate `GET /razorpay-test` |
@@ -275,7 +275,7 @@ cd backend
 .\venv\Scripts\python.exe -m pytest -v
 ```
 
-Covers classifier, policy/guardrails, LangGraph recovery paths, webhooks, metrics identities, email simulation, customer STOP, and demo seeding (**70+** tests).
+Covers classifier, policy/guardrails, LangGraph recovery paths, webhooks, metrics identities, email simulation, customer STOP, and sample seeding (**70+** tests).
 
 ---
 
@@ -289,7 +289,7 @@ Covers classifier, policy/guardrails, LangGraph recovery paths, webhooks, metric
 4. Set at least:
    - `RZP_KEY_ID`, `RZP_KEY_SECRET`
    - `CORS_ORIGINS=https://razorpay-lost-revenue-recovery.vercel.app`
-   - `EMAIL_SEND_LIVE=false` (recommended for demos)
+   - `EMAIL_SEND_LIVE=false` (keep false unless you intentionally want live outreach)
 5. Health check path: `/`
 6. Razorpay webhook target (when wiring live events):
 
@@ -306,18 +306,18 @@ https://razorpay-revenue-recovery-api.onrender.com/webhooks/razorpay
 
 ---
 
-## Safety & demo notes
+## Safety notes
 
 - **Opt-out:** customer `STOP` (API / dashboard button) halts further recovery for that transaction.
 - **Attempt cap:** policy blocks after 3 recovery attempts.
 - **Email credits:** keep `EMAIL_SEND_LIVE=false` unless you intentionally want Resend to send real mail.
 - **Secrets:** `backend/.env`, `*.db`, and real API keys are gitignored — use the `.env.example` templates only.
-- **PoC scope:** webhook signature verification is prepared via `RZP_WEBHOOK_SECRET` but not enforced in this demo build.
+- **PoC scope:** webhook signature verification is prepared via `RZP_WEBHOOK_SECRET` but not enforced in this build.
 
 ---
 
 ## Authors
 
-Built for a Razorpay-oriented hackathon / course submission — payment recovery control plane with auditable AI orchestration.
+Built for the **Razorpay Buildathon** — and as a personal project beyond it — payment recovery control plane with auditable AI orchestration.
 
 If you’re judging: start at the **live dashboard**, click a recovered transaction, then a pending one, and try **STOP recovery** once.
