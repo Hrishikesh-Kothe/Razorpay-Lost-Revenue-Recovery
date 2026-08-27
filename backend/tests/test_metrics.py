@@ -11,6 +11,7 @@ def test_calculate_metrics_empty_database(db_session):
 
     assert metrics["total_transactions"] == 0
     assert metrics["total_money_at_risk"] == 0
+    assert metrics["still_at_risk"] == 0
     assert metrics["total_recovered"] == 0
     assert metrics["recovered_transactions"] == 0
     assert metrics["failed_recoveries"] == 0
@@ -61,6 +62,7 @@ def test_calculate_metrics_with_mixed_transactions(
 
     assert metrics["total_transactions"] == 4
     assert metrics["total_money_at_risk"] == 375000
+    assert metrics["still_at_risk"] == 275000
     assert metrics["total_recovered"] == 100000
     assert metrics["recovered_transactions"] == 1
     assert metrics["failed_recoveries"] == 1
@@ -70,6 +72,16 @@ def test_calculate_metrics_with_mixed_transactions(
     assert metrics["recovery_coverage"] == 75.0
     assert metrics["recovery_rate"] == 25.0
     assert metrics["recovery_yield"] == 26.7
+    assert (
+        metrics["total_recovered"] + metrics["still_at_risk"]
+        == metrics["total_money_at_risk"]
+    )
+    assert (
+        metrics["recovered_transactions"]
+        + metrics["failed_recoveries"]
+        + metrics["pending_recoveries"]
+        == metrics["total_transactions"]
+    )
     assert metrics["state_counts"]["RETRY_SCHEDULED"] == 1
     assert metrics["state_counts"]["OUTREACH_SENT"] == 1
     assert metrics["state_counts"]["RECOVERY_LINK_CREATED"] == 1

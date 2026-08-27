@@ -24,6 +24,7 @@ import {
 type Metrics = {
   total_transactions: number;
   total_money_at_risk: number;
+  still_at_risk: number;
   total_recovered: number;
   recovered_transactions: number;
   failed_recoveries: number;
@@ -32,6 +33,7 @@ type Metrics = {
   recovery_rate: number;
   recovery_yield: number;
   recovery_coverage: number;
+  opted_out?: number;
   state_counts: {
     RECOVERY_LINK_CREATED?: number;
     OUTREACH_PENDING?: number;
@@ -334,31 +336,36 @@ export default function Home() {
 
   const stateRows = [
     {
+      key: "RETRY_SCHEDULED",
+      label: "Auto retry scheduled",
+      value: metrics?.state_counts.RETRY_SCHEDULED || 0,
+    },
+    {
       key: "OUTREACH_SENT",
-      label: "OUTREACH_SENT",
+      label: "Email outreach sent",
       value: metrics?.state_counts.OUTREACH_SENT || 0,
     },
     {
       key: "OUTREACH_PENDING",
-      label: "OUTREACH_PENDING",
+      label: "Outreach pending send",
       value: metrics?.state_counts.OUTREACH_PENDING || 0,
     },
     {
-      key: "RETRY_SCHEDULED",
-      label: "RETRY_SCHEDULED",
-      value: metrics?.state_counts.RETRY_SCHEDULED || 0,
-    },
-    {
       key: "RECOVERY_LINK_CREATED",
-      label: "RECOVERY_LINK_CREATED",
+      label: "Discount payment link",
       value: metrics?.state_counts.RECOVERY_LINK_CREATED || 0,
     },
     {
       key: "OPTED_OUT",
-      label: "OPTED_OUT",
+      label: "Customer opted out",
       value: metrics?.state_counts.OPTED_OUT || 0,
     },
   ];
+
+  const recoveredCount = metrics?.recovered_transactions ?? 0;
+  const failedCount = metrics?.failed_recoveries ?? 0;
+  const pendingCount = metrics?.pending_recoveries ?? 0;
+  const totalCount = metrics?.total_transactions ?? 0;
 
   return (
     <main className="dashboard">
@@ -393,64 +400,86 @@ export default function Home() {
       <section className="metrics-grid metrics-grid-six">
         <MetricCard
           icon={<Activity />}
-          label="Transactions"
+          label="Failed payments"
           value={
-            loading
-              ? "..."
-              : (metrics?.total_transactions ?? 0).toString()
+            loading ? "..." : totalCount.toString()
           }
-          description="Payment failures ingested"
+          description="All payment failures ingested"
         />
         <MetricCard
           icon={<IndianRupee />}
-          label="Money at Risk"
+          label="Failed value"
           value={
             loading
               ? "..."
               : formatRupees(metrics?.total_money_at_risk || 0)
           }
-          description="Total transaction value"
+          description="Sum of every failed amount"
         />
         <MetricCard
           icon={<WalletCards />}
-          label="Money Recovered"
+          label="Recovered"
           value={
             loading
               ? "..."
               : formatRupees(metrics?.total_recovered || 0)
           }
-          description="Recovered amount"
-        />
-        <MetricCard
-          icon={<CheckCircle2 />}
-          label="Recovery Yield"
-          value={`${metrics?.recovery_yield ?? 0}%`}
-          description="Recovered / money at risk"
-        />
-        <MetricCard
-          icon={<ShieldCheck />}
-          label="Success Rate"
-          value={`${metrics?.recovery_rate ?? 0}%`}
-          description="Recovered transactions"
+          description={`${recoveredCount} payments won back`}
         />
         <MetricCard
           icon={<Clock3 />}
-          label="Recovery Actions"
+          label="Still open"
           value={
             loading
               ? "..."
-              : (metrics?.recovery_actions ?? 0).toString()
+              : formatRupees(metrics?.still_at_risk || 0)
           }
-          description="Active recovery paths"
+          description="Failed value − recovered"
+        />
+        <MetricCard
+          icon={<CheckCircle2 />}
+          label="Success rate"
+          value={`${metrics?.recovery_rate ?? 0}%`}
+          description="Recovered payments ÷ all failures"
+        />
+        <MetricCard
+          icon={<ShieldCheck />}
+          label="Recovery yield"
+          value={`${metrics?.recovery_yield ?? 0}%`}
+          description="Recovered ₹ ÷ failed value"
         />
       </section>
+
+      {!loading && metrics && (
+        <section className="metric-equations">
+          <div className="equation-pill">
+            <strong>{recoveredCount}</strong> recovered
+            <span>+</span>
+            <strong>{failedCount}</strong> failed
+            <span>+</span>
+            <strong>{pendingCount}</strong> pending
+            <span>=</span>
+            <strong>{totalCount}</strong> failed payments
+          </div>
+          <div className="equation-pill">
+            <strong>{formatRupees(metrics.total_recovered)}</strong>
+            recovered
+            <span>+</span>
+            <strong>{formatRupees(metrics.still_at_risk)}</strong>
+            still open
+            <span>=</span>
+            <strong>{formatRupees(metrics.total_money_at_risk)}</strong>
+            failed value
+          </div>
+        </section>
+      )}
 
       <section className="analytics-grid">
         <div className="panel chart-panel">
           <div className="panel-header">
             <div>
-              <h2>Recovery Distribution</h2>
-              <p>Current recovery actions by type</p>
+              <h2>Recovery path mix</h2>
+              <p>Which action the engine chose (by current state)</p>
             </div>
             <WalletCards size={22} />
           </div>
@@ -491,8 +520,8 @@ export default function Home() {
         <div className="panel chart-panel">
           <div className="panel-header">
             <div>
-              <h2>Recovery Outcomes</h2>
-              <p>Recovered vs failed vs pending</p>
+              <h2>Outcomes</h2>
+              <p>Recovered + failed + pending = all failures</p>
             </div>
             <CheckCircle2 size={22} />
           </div>
@@ -535,8 +564,8 @@ export default function Home() {
         <div className="panel">
           <div className="panel-header">
             <div>
-              <h2>State Distribution</h2>
-              <p>Live engine state counts</p>
+              <h2>Engine states</h2>
+              <p>Where each failure sits right now</p>
             </div>
             <Clock3 size={22} />
           </div>

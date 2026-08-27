@@ -4,6 +4,7 @@ from app.core.razorpay_client import client
 from app.api.webhooks import router as webhook_router
 from app.api.customer import router as customer_router
 from app.api.metrics import router as metrics_router
+from app.api.demo import router as demo_router
 from fastapi.middleware.cors import CORSMiddleware
 import os
 
@@ -30,6 +31,7 @@ app.add_middleware(
 app.include_router(webhook_router)
 app.include_router(customer_router)
 app.include_router(metrics_router)
+app.include_router(demo_router)
 
 
 @app.get("/")

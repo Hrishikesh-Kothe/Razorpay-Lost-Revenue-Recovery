@@ -26,3 +26,5 @@ services:
         sync: false
       - key: EMAIL_SEND_LIVE
         value: "false"
+      - key: ENABLE_DEMO_SEED
+        value: "false"

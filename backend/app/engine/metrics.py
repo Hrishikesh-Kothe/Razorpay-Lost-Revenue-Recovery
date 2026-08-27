@@ -18,6 +18,12 @@ def calculate_metrics(db: Session):
         for transaction in transactions
     )
 
+    still_at_risk = sum(
+        transaction.amount
+        for transaction in transactions
+        if transaction.recovery_outcome != "RECOVERED"
+    )
+
     recovered_transactions = sum(
         1
         for transaction in transactions
@@ -75,6 +81,7 @@ def calculate_metrics(db: Session):
     return {
         "total_transactions": total_transactions,
         "total_money_at_risk": total_money_at_risk,
+        "still_at_risk": still_at_risk,
         "total_recovered": total_recovered,
         "recovered_transactions": recovered_transactions,
         "failed_recoveries": failed_recoveries,
