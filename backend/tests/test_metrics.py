@@ -1,4 +1,8 @@
-from app.engine.metrics import calculate_metrics, get_execution_logs
+from app.engine.metrics import (
+    calculate_metrics,
+    get_execution_logs,
+    list_transactions,
+)
 from app.engine.state_manager import transition_state
 
 
@@ -201,3 +205,37 @@ def test_transaction_detail_endpoint_not_found(client):
     response = client.get("/metrics/transactions/missing_txn")
 
     assert response.status_code == 404
+
+
+def test_list_transactions_orders_newest_first(
+    db_session,
+    make_transaction,
+):
+    make_transaction(transaction_id="txn_list_old", amount=10000)
+    make_transaction(transaction_id="txn_list_new", amount=20000)
+
+    rows = list_transactions(db_session)
+
+    assert len(rows) == 2
+    assert rows[0]["transaction_id"] == "txn_list_new"
+    assert rows[1]["transaction_id"] == "txn_list_old"
+    assert rows[0]["amount"] == 20000
+    assert "current_state" in rows[0]
+
+
+def test_list_transactions_endpoint_respects_limit(
+    client,
+    make_transaction,
+):
+    for index in range(3):
+        make_transaction(transaction_id=f"txn_limit_{index}")
+
+    response = client.get("/metrics/transactions?limit=2")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["transactions"]) == 2
+
+    all_response = client.get("/metrics/transactions")
+    assert all_response.status_code == 200
+    assert len(all_response.json()["transactions"]) == 3

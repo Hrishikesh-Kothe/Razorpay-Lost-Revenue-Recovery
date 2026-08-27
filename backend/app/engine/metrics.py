@@ -118,6 +118,43 @@ def get_execution_logs(
     return [_serialize_log(log) for log in logs]
 
 
+def _serialize_transaction_summary(transaction: Transaction):
+    return {
+        "transaction_id": transaction.transaction_id,
+        "customer_id": transaction.customer_id,
+        "amount": transaction.amount,
+        "error_code": transaction.error_code,
+        "failure_type": transaction.failure_type,
+        "current_state": transaction.current_state,
+        "attempt_count": transaction.attempt_count,
+        "opt_out": transaction.opt_out,
+        "recovery_outcome": transaction.recovery_outcome,
+        "recovered_amount": transaction.recovered_amount,
+        "created_at": (
+            transaction.created_at.isoformat()
+            if transaction.created_at
+            else None
+        ),
+        "updated_at": (
+            transaction.updated_at.isoformat()
+            if transaction.updated_at
+            else None
+        ),
+    }
+
+
+def list_transactions(db: Session, limit: int | None = None):
+    query = db.query(Transaction).order_by(
+        Transaction.updated_at.desc(),
+        Transaction.id.desc(),
+    )
+
+    if limit is not None:
+        query = query.limit(limit)
+
+    return [_serialize_transaction_summary(txn) for txn in query.all()]
+
+
 def get_transaction_detail(db: Session, transaction_id: str):
     transaction = (
         db.query(Transaction)

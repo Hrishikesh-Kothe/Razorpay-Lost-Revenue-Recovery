@@ -9,7 +9,6 @@ import {
   IndianRupee,
   ShieldCheck,
   WalletCards,
-  ArrowRight,
   X,
 } from "lucide-react";
 
@@ -52,6 +51,21 @@ type ExecutionLog = {
   created_at: string | null;
 };
 
+type TransactionSummary = {
+  transaction_id: string;
+  customer_id: string | null;
+  amount: number;
+  error_code: string | null;
+  failure_type: string | null;
+  current_state: string;
+  attempt_count: number;
+  opt_out: boolean;
+  recovery_outcome: string;
+  recovered_amount: number;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
 type TransactionDetail = {
   transaction_id: string;
   customer_id: string | null;
@@ -88,7 +102,9 @@ export default function Home() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [logs, setLogs] = useState<ExecutionLog[]>([]);
+  const [recentTransactions, setRecentTransactions] = useState<
+    TransactionSummary[]
+  >([]);
   const [engineOnline, setEngineOnline] = useState(false);
   const [selectedTxnId, setSelectedTxnId] = useState<string | null>(null);
   const [detail, setDetail] = useState<TransactionDetailResponse | null>(
@@ -98,29 +114,35 @@ export default function Home() {
   const [detailError, setDetailError] = useState("");
   const [optOutLoading, setOptOutLoading] = useState(false);
   const [optOutMessage, setOptOutMessage] = useState("");
+  const [showAllTransactions, setShowAllTransactions] = useState(false);
+  const [allTransactions, setAllTransactions] = useState<
+    TransactionSummary[]
+  >([]);
+  const [allLoading, setAllLoading] = useState(false);
+  const [allError, setAllError] = useState("");
 
   const fetchDashboardData = async () => {
     try {
       setError("");
 
-      const [healthResponse, metricsResponse, logsResponse] =
+      const [healthResponse, metricsResponse, txnsResponse] =
         await Promise.all([
           fetch(`${API_URL}/`),
           fetch(`${API_URL}/metrics/`),
-          fetch(`${API_URL}/metrics/logs?limit=25`),
+          fetch(`${API_URL}/metrics/transactions?limit=10`),
         ]);
 
       setEngineOnline(healthResponse.ok);
 
-      if (!metricsResponse.ok || !logsResponse.ok) {
+      if (!metricsResponse.ok || !txnsResponse.ok) {
         throw new Error("Failed to fetch dashboard data");
       }
 
       const metricsData = await metricsResponse.json();
-      const logsData = await logsResponse.json();
+      const txnsData = await txnsResponse.json();
 
       setMetrics(metricsData);
-      setLogs(logsData.logs || []);
+      setRecentTransactions(txnsData.transactions || []);
     } catch (err) {
       console.error(err);
       setEngineOnline(false);
@@ -232,6 +254,33 @@ export default function Home() {
     } finally {
       setOptOutLoading(false);
     }
+  };
+
+  const openAllTransactions = async () => {
+    setShowAllTransactions(true);
+    setAllLoading(true);
+    setAllError("");
+
+    try {
+      const response = await fetch(`${API_URL}/metrics/transactions`);
+
+      if (!response.ok) {
+        throw new Error("Failed to load transactions");
+      }
+
+      const data = await response.json();
+      setAllTransactions(data.transactions || []);
+    } catch (err) {
+      console.error(err);
+      setAllError("Unable to load all transactions.");
+    } finally {
+      setAllLoading(false);
+    }
+  };
+
+  const openTransaction = (transactionId: string) => {
+    setShowAllTransactions(false);
+    setSelectedTxnId(transactionId);
   };
 
   const formatRupees = (paise: number) => {
@@ -508,34 +557,43 @@ export default function Home() {
         <div className="panel-header">
           <div>
             <h2>Live Execution</h2>
-            <p>Click a transaction to inspect its recovery timeline</p>
+            <p>One row per transaction — click to open the recovery timeline</p>
           </div>
-          <div className="live-indicator">
-            <span
-              className={
-                engineOnline ? "status-dot" : "status-dot offline"
-              }
-            />
-            LIVE
+          <div className="logs-header-actions">
+            <button
+              type="button"
+              className="view-all-btn"
+              onClick={openAllTransactions}
+            >
+              View all transactions
+            </button>
+            <div className="live-indicator">
+              <span
+                className={
+                  engineOnline ? "status-dot" : "status-dot offline"
+                }
+              />
+              LIVE
+            </div>
           </div>
         </div>
 
         <div className="logs-list">
           {loading ? (
-            <div className="loading">Loading execution logs...</div>
-          ) : logs.length === 0 ? (
-            <div className="loading">No execution logs available.</div>
+            <div className="loading">Loading recent transactions...</div>
+          ) : recentTransactions.length === 0 ? (
+            <div className="loading">No transactions yet.</div>
           ) : (
-            logs.map((log) => (
+            recentTransactions.map((txn) => (
               <button
                 type="button"
                 className={`log-row ${
-                  selectedTxnId === log.transaction_id
+                  selectedTxnId === txn.transaction_id
                     ? "log-row-selected"
                     : ""
                 }`}
-                key={log.id}
-                onClick={() => setSelectedTxnId(log.transaction_id)}
+                key={txn.transaction_id}
+                onClick={() => setSelectedTxnId(txn.transaction_id)}
               >
                 <div className="log-icon">
                   <Activity size={17} />
@@ -543,21 +601,18 @@ export default function Home() {
 
                 <div className="log-main">
                   <div className="log-top">
+                    <span className="log-txn">{txn.transaction_id}</span>
                     <span className="log-time">
-                      {formatTime(log.created_at)}
+                      {formatTime(txn.updated_at || txn.created_at)}
                     </span>
-                    <strong>{log.action}</strong>
                   </div>
 
-                  <div className="log-transition">
-                    {log.previous_state || "START"}
-                    <ArrowRight size={14} />
-                    {log.new_state}
-                  </div>
-
-                  <div className="log-details">
-                    <span className="log-txn">{log.transaction_id}</span>
-                    <span>{log.reason}</span>
+                  <div className="log-details log-details-inline">
+                    <span>{formatRupees(txn.amount)}</span>
+                    <span>{txn.failure_type || txn.error_code || "—"}</span>
+                    <span className="log-state-badge">
+                      {txn.current_state}
+                    </span>
                   </div>
                 </div>
               </button>
@@ -565,6 +620,75 @@ export default function Home() {
           )}
         </div>
       </section>
+
+      {showAllTransactions && (
+        <div
+          className="drawer-backdrop drawer-backdrop-center"
+          onClick={() => setShowAllTransactions(false)}
+        >
+          <aside
+            className="all-txns-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="drawer-header">
+              <div>
+                <p className="eyebrow">ALL TRANSACTIONS</p>
+                <h2>
+                  {allLoading
+                    ? "Loading..."
+                    : `${allTransactions.length} total`}
+                </h2>
+              </div>
+              <button
+                type="button"
+                className="drawer-close"
+                onClick={() => setShowAllTransactions(false)}
+                aria-label="Close all transactions"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="all-txns-list">
+              {allLoading ? (
+                <div className="loading">Loading transactions...</div>
+              ) : allError ? (
+                <div className="error-banner">{allError}</div>
+              ) : allTransactions.length === 0 ? (
+                <div className="loading">No transactions found.</div>
+              ) : (
+                allTransactions.map((txn) => (
+                  <button
+                    type="button"
+                    className="log-row"
+                    key={txn.transaction_id}
+                    onClick={() => openTransaction(txn.transaction_id)}
+                  >
+                    <div className="log-main">
+                      <div className="log-top">
+                        <span className="log-txn">{txn.transaction_id}</span>
+                        <span className="log-time">
+                          {formatTime(txn.updated_at || txn.created_at)}
+                        </span>
+                      </div>
+                      <div className="log-details log-details-inline">
+                        <span>{formatRupees(txn.amount)}</span>
+                        <span>
+                          {txn.failure_type || txn.error_code || "—"}
+                        </span>
+                        <span className="log-state-badge">
+                          {txn.current_state}
+                        </span>
+                        <span>{txn.recovery_outcome}</span>
+                      </div>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </aside>
+        </div>
+      )}
 
       {selectedTxnId && (
         <div
